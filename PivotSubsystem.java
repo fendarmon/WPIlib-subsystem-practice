@@ -62,8 +62,8 @@ public class PivotSubsystem extends SubsystemBase {
     .allowedClosedLoopError(0.5);
 
     m_motor.configure(config, null, null);
-
-    // configure feedForward
+    
+    // reset encoder offset
     resetRelativeToAbsolute();
   }
 
