@@ -14,62 +14,73 @@ import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 
 import edu.wpi.first.math.controller.ArmFeedforward;
+import edu.wpi.first.math.controller.ElevatorFeedforward;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
-import frc.robot.Constants.ArmConstants;
+import frc.robot.Constants.ElevatorConstants;
+import frc.robot.Constants.ElevatorPIDConstants;
+import frc.robot.Constants.ElevatorFeedforwardConstants;;
 
-public class PivotSubsystem extends SubsystemBase {
+public class ElevatorSubsystem extends SubsystemBase {
 
-  private DutyCycleEncoder m_absoluteEncoder;
   private RelativeEncoder m_relativeEncoder;
 
   private SparkMax m_motor;
   private SparkClosedLoopController m_controller;
   private SparkMaxConfig config;
 
-  public PivotSubsystem()
+  // feedforward constants
+  private static final double kS = ElevatorFeedforwardConstants.kS; // static
+  private static final double kV = ElevatorFeedforwardConstants.kV; // velocity
+  private static final double kG = ElevatorFeedforwardConstants.kG; // gravity
+  private static final double kA = ElevatorFeedforwardConstants.kA; // acceleration
+
+  private ElevatorFeedforward eff;
+  private double voltage;
+
+  public ElevatorSubsystem()
   {
   
-    m_motor = new SparkMax(ArmConstants.MOTOR_ID, MotorType.kBrushless);
-    m_absoluteEncoder = new DutyCycleEncoder(ArmConstants.ENCODER_PORT, 360, ArmConstants.ENCODER_OFFSET);
+    m_motor = new SparkMax(ElevatorConstants.ELEVATE_MOTOR_ID, MotorType.kBrushless);
     m_relativeEncoder = m_motor.getEncoder();
     
-    // initialize PID controller
+    // initialize PID controller & feedForward
     m_controller = m_motor.getClosedLoopController();
+    eff = new ElevatorFeedforward(kS, kG, kV, kA);
     
     config = new SparkMaxConfig();
 
     // configure PID
     config.closedLoop
-    .pid(ArmConstants.Kp, ArmConstants.Ki, ArmConstants.Kd, ClosedLoopSlot.kSlot1)
-    .outputRange(-ArmConstants.SPEED_LIMIT, ArmConstants.SPEED_LIMIT)
+    .pid(ElevatorPIDConstants.kP, ElevatorPIDConstants.kI, ElevatorPIDConstants.kD, ClosedLoopSlot.kSlot1)
+    .outputRange(-1, 1)
     .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
     .maxMotion
     .allowedClosedLoopError(0.5);
 
     m_motor.configure(config, null, null);
-    
-    // reset encoder offset
-    resetRelativeToAbsolute();
   }
 
-    public void SetPosition(double angle) 
+  public void SetPosition(double angle) 
   {
     m_controller.setReference(angle, ControlType.kPosition);
+  }
+
+  public void Set(double voltage) 
+  {
+    m_controller.setReference(voltage, ControlType.kVoltage);
   }
   
   public double getAngle() {
     return m_relativeEncoder.getPosition();
   }
 
-  public double getAbsoluteAngle() {
-    return m_absoluteEncoder.get();
-  }
-
-  private void resetRelativeToAbsolute() {
-    double absoluteDeg = getAbsoluteAngle();
-    m_relativeEncoder.setPosition(absoluteDeg);
+  // get feedforward voltage for the Set() method
+  private double calculateFF(double targetSpeed) 
+  {
+    voltage = eff.calculate(Math.toRadians(getAngle()), targetSpeed);
+    return voltage;
   }
 }
