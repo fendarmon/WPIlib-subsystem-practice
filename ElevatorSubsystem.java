@@ -1,12 +1,12 @@
 package frc.robot.subsystems;
 
 import com.revrobotics.RelativeEncoder;
-import com.revrobotics.servohub.ServoHub.ResetMode;
 import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.ClosedLoopConfig;
 import com.revrobotics.spark.config.SparkBaseConfig;
@@ -60,24 +60,37 @@ public class ElevatorSubsystem extends SubsystemBase {
     .maxMotion
     .allowedClosedLoopError(0.5);
 
-    m_motor.configure(config, null, null);
+    m_motor.configure(config, ResetMode.kResetSafeParameters, PersistMode.kNoPersistParameters);
   }
 
+  /*
+   * sets the motor to a given angle
+   */
   public void SetPosition(double angle) 
   {
-    m_controller.setReference(angle, ControlType.kPosition);
-  }
-
-  public void Set(double voltage) 
-  {
-    m_controller.setReference(voltage, ControlType.kVoltage);
+    m_controller.setReference(angle, ControlType.kPosition, ClosedLoopSlot.kSlot0, kG);
   }
   
+  /*
+   * sets the the motor with a given voltage
+   */
+  public void Set(double voltage) 
+  {
+    m_controller.setReference(voltage, ControlType.kVoltage, ClosedLoopSlot.kSlot0, kG);
+  }
+  
+  /*
+   * returns the angle of the relative encoder of the brushless motor
+   */
   public double getAngle() {
     return m_relativeEncoder.getPosition();
   }
 
-  // get feedforward voltage for the Set() method
+  /*
+   * elevator feedfoward voltage calculation
+   * param:
+   * targetSpeed: the speed needed for the motor to reach
+   */
   private double calculateFF(double targetSpeed) 
   {
     voltage = eff.calculate(Math.toRadians(getAngle()), targetSpeed);
