@@ -15,6 +15,7 @@ import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 
 import edu.wpi.first.math.controller.ArmFeedforward;
 import edu.wpi.first.math.controller.ElevatorFeedforward;
+import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.wpilibj.DutyCycleEncoder;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -33,12 +34,11 @@ public class ElevatorSubsystem extends SubsystemBase {
 
   // feedforward constants
   private static final double kS = ElevatorFeedforwardConstants.kS; // static
-  private static final double kV = ElevatorFeedforwardConstants.kV; // velocity
   private static final double kG = ElevatorFeedforwardConstants.kG; // gravity
+  private static final double kV = ElevatorFeedforwardConstants.kV; // gravity
   private static final double kA = ElevatorFeedforwardConstants.kA; // acceleration
 
   private ElevatorFeedforward eff;
-  private double voltage;
 
   public ElevatorSubsystem()
   {
@@ -48,12 +48,13 @@ public class ElevatorSubsystem extends SubsystemBase {
     
     // initialize PID controller & feedForward
     m_controller = m_motor.getClosedLoopController();
-    eff = new ElevatorFeedforward(kS, kG, kV, kA);
+    eff = new ElevatorFeedforward(kS, kG, kA);
     
     config = new SparkMaxConfig();
 
     // configure PID
     config.closedLoop
+    .velocityFF(1.0/kV)
     .pid(ElevatorPIDConstants.kP, ElevatorPIDConstants.kI, ElevatorPIDConstants.kD, ClosedLoopSlot.kSlot1)
     .outputRange(-1, 1)
     .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
@@ -66,9 +67,11 @@ public class ElevatorSubsystem extends SubsystemBase {
   /*
    * sets the motor to a given angle
    */
-  public void SetPosition(double angle) 
+  public void SetPosition(double targetheight) 
   {
-    m_controller.setReference(angle, ControlType.kPosition, ClosedLoopSlot.kSlot0, kG);
+    double arbFFVolts = eff.calculate(Math.toRadians(targetheight));
+
+    m_controller.setReference(targetheight, ControlType.kPosition, ClosedLoopSlot.kSlot0, arbFFVolts);
   }
   
   /*
@@ -76,24 +79,18 @@ public class ElevatorSubsystem extends SubsystemBase {
    */
   public void Set(double voltage) 
   {
-    m_controller.setReference(voltage, ControlType.kVoltage, ClosedLoopSlot.kSlot0, kG);
+    // returns +- 1 depends on the value
+    double direction = Math.signum(voltage);
+    // target velocity is 0 because we want gravity compensation
+    double arbFFVolts = eff.calculate(0.0) * direction;
+
+    m_controller.setReference(voltage, ControlType.kVoltage, ClosedLoopSlot.kSlot0, arbFFVolts);
   }
   
   /*
    * returns the angle of the relative encoder of the brushless motor
    */
-  public double getAngle() {
+  public double getCurrentHeight() {
     return m_relativeEncoder.getPosition();
-  }
-
-  /*
-   * elevator feedfoward voltage calculation
-   * param:
-   * targetSpeed: the speed needed for the motor to reach
-   */
-  private double calculateFF(double targetSpeed) 
-  {
-    voltage = eff.calculate(Math.toRadians(getAngle()), targetSpeed);
-    return voltage;
   }
 }
